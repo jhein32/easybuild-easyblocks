@@ -1,5 +1,5 @@
 ##
-# Copyright 2009-2018 Ghent University
+# Copyright 2009-2019 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -28,9 +28,7 @@ EasyBuild support for Perl, implemented as an easyblock
 @author: Jens Timmerman (Ghent University)
 @author: Kenneth Hoste (Ghent University)
 """
-
 import os
-import re
 
 from easybuild.easyblocks.generic.configuremake import ConfigureMake
 from easybuild.framework.easyconfig import CUSTOM
@@ -47,7 +45,7 @@ class EB_Perl(ConfigureMake):
     def extra_options():
         """Add extra config options specific to Perl."""
         extra_vars = {
-            'use_perl_threads': [True, "Use internal Perl threads by means of the -Dusethreads compiler directive", CUSTOM],
+            'use_perl_threads': [True, "Enable use of internal Perl threads via -Dusethreads configure option", CUSTOM],
         }
         return ConfigureMake.extra_options(extra_vars)
 
@@ -55,16 +53,28 @@ class EB_Perl(ConfigureMake):
         """
         Configure Perl build: run ./Configure instead of ./configure with some different options
         """
+        majver = self.version.split('.')[0]
         configopts = [
             self.cfg['configopts'],
             '-Dcc="{0}"'.format(os.getenv('CC')),
             '-Dccflags="{0}"'.format(os.getenv('CFLAGS')),
             '-Dinc_version_list=none',
+            '-Dprefix=%(installdir)s',
+            # guarantee that scripts are installed in /bin in the installation directory (and not in a guessed path)
+            # see https://github.com/easybuilders/easybuild-easyblocks/issues/1659
+            '-Dinstallscript=%(installdir)s/bin',
+            '-Dscriptdir=%(installdir)s/bin',
+            '-Dscriptdirexp=%(installdir)s/bin',
+            # guarantee that the install directory has the form lib/perlX/
+            # see https://github.com/easybuilders/easybuild-easyblocks/issues/1700
+            "-Dinstallstyle='lib/perl%s'" % majver,
         ]
         if self.cfg['use_perl_threads']:
             configopts.append('-Dusethreads')
 
-        cmd = './Configure -de %s -Dprefix="%s"' % (' '.join(configopts), self.installdir)
+        configopts = (' '.join(configopts)) % {'installdir': self.installdir}
+
+        cmd = './Configure -de %s' % configopts
         run_cmd(cmd, log_all=True, simple=True)
 
     def test_step(self):
@@ -107,6 +117,7 @@ def get_major_perl_version():
     (perlmajver, _) = run_cmd(cmd, log_all=True, log_output=True, simple=False)
     return perlmajver
 
+
 def get_site_suffix(tag):
     """
     Returns the suffix for site* (e.g. sitearch, sitelib)
@@ -120,8 +131,3 @@ def get_site_suffix(tag):
     (sitesuffix, _) = run_cmd(cmd, log_all=True, log_output=True, simple=False)
     # obtained value usually contains leading '/', so strip it off
     return sitesuffix.lstrip(os.path.sep)
-
-def get_sitearch_suffix():
-    """Deprecated more specific version of get_site_suffix. Only here for backward compatibility."""
-    _log = fancylogger.getLogger('Perl.get_sitearch_suffix', fname=False)
-    _log.nosupport("Use get_site_suffix('sitearch') instead of get_sitearch_suffix()", "2.0")

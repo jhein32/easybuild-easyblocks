@@ -1,5 +1,5 @@
 # #
-# Copyright 2009-2018 Ghent University
+# Copyright 2009-2019 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -207,7 +207,7 @@ class IntelBase(EasyBlock):
                     remove_file(path)
                 else:
                     shutil.rmtree(path)
-        except OSError, err:
+        except OSError as err:
             raise EasyBuildError("Cleaning up intel dir %s failed: %s", self.home_subdir_local, err)
 
     def setup_local_home_subdir(self):
@@ -244,7 +244,7 @@ class IntelBase(EasyBlock):
                 os.symlink(self.home_subdir_local, self.home_subdir)
                 self.log.debug("Created symlink (2) %s to %s" % (self.home_subdir, self.home_subdir_local))
 
-        except OSError, err:
+        except OSError as err:
             raise EasyBuildError("Failed to symlink %s to %s: %s", self.home_subdir_local, self.home_subdir, err)
 
     def prepare_step(self, *args, **kwargs):
@@ -408,7 +408,14 @@ class IntelBase(EasyBlock):
         env.setvar('INSTALL_PATH', self.installdir)
 
         # perform installation
-        cmd = "./install.sh %s -s %s" % (tmppathopt, silentcfg)
+        cmd = ' '.join([
+            self.cfg['preinstallopts'],
+            './install.sh',
+            tmppathopt,
+            '-s ' + silentcfg,
+            self.cfg['installopts'],
+        ])
+
         return run_cmd(cmd, log_all=True, simple=True, log_output=True)
 
     def move_after_install(self):
@@ -429,7 +436,7 @@ class IntelBase(EasyBlock):
                 self.log.debug("Moving %s to %s" % (source, target))
                 shutil.move(source, target)
             shutil.rmtree(os.path.join(self.installdir, self.name))
-        except OSError, err:
+        except OSError as err:
             raise EasyBuildError("Failed to move contents of %s to %s: %s", subdir, self.installdir, err)
 
     def sanity_check_rpath(self):
@@ -444,12 +451,6 @@ class IntelBase(EasyBlock):
         if self.requires_runtime_license:
             txt += self.module_generator.prepend_paths(self.license_env_var, [self.license_file],
                                                        allow_abs=True, expand_relpaths=False)
-
-        if self.cfg['m32']:
-            nlspath = os.path.join('idb', '32', 'locale', '%l_%t', '%N')
-        else:
-            nlspath = os.path.join('idb', 'intel64', 'locale', '%l_%t', '%N')
-        txt += self.module_generator.prepend_paths('NLSPATH', nlspath)
 
         return txt
 

@@ -1,5 +1,5 @@
 # #
-# Copyright 2013 Ghent University
+# Copyright 2013-2019 Ghent University
 #
 # This file is part of EasyBuild,
 # originally created by the HPC team of Ghent University (http://ugent.be/hpc/en),
@@ -51,7 +51,7 @@ class EB_EasyBuildMeta(PythonPackage):
         self.real_initial_environ = None
 
         self.easybuild_pkgs = ['easybuild-framework', 'easybuild-easyblocks', 'easybuild-easyconfigs']
-        if LooseVersion(self.version) >= LooseVersion('2.0'):
+        if LooseVersion(self.version) >= LooseVersion('2.0') and LooseVersion(self.version) <= LooseVersion('3.999'):
             # deliberately include vsc-install & vsc-base twice;
             # first time to ensure the specified vsc-install/vsc-base package is available when framework gets installed
             self.easybuild_pkgs.insert(0, 'vsc-base')
@@ -98,7 +98,7 @@ class EB_EasyBuildMeta(PythonPackage):
                     os.chdir(os.path.join(self.builddir, seldirs[0]))
                     super(EB_EasyBuildMeta, self).install_step()
 
-        except OSError, err:
+        except OSError as err:
             raise EasyBuildError("Failed to install EasyBuild packages: %s", err)
 
     def post_install_step(self):
@@ -124,7 +124,12 @@ class EB_EasyBuildMeta(PythonPackage):
         easy_install_pth = os.path.join(self.installdir, self.pylibdir, 'easy-install.pth')
         if os.path.exists(easy_install_pth):
             easy_install_pth_txt = read_file(easy_install_pth)
-            for pkg in [p for p in self.easybuild_pkgs if p not in ['setuptools', 'vsc-install']]:
+
+            ignore_pkgs = ['setuptools', 'vsc-install']
+            if LooseVersion(self.version) > LooseVersion('3.999'):
+                ignore_pkgs.append('vsc-base')
+
+            for pkg in [p for p in self.easybuild_pkgs if p not in ignore_pkgs]:
                 if pkg == 'vsc-base':
                     # don't include strict version check for vsc-base
                     pkg_regex = re.compile(r"^\./%s" % pkg.replace('-', '_'), re.M)
@@ -143,7 +148,7 @@ class EB_EasyBuildMeta(PythonPackage):
             'easybuild-easyblocks': [('easybuild/easyblocks', True)],
             'easybuild-easyconfigs': [('easybuild/easyconfigs', False)],
         }
-        if LooseVersion(self.version) >= LooseVersion('2.0'):
+        if LooseVersion(self.version) >= LooseVersion('2.0') and LooseVersion(self.version) < LooseVersion('3.999'):
             subdirs_by_pkg.update({
                 'vsc-base': [('vsc/utils', True)],
             })
@@ -180,7 +185,7 @@ class EB_EasyBuildMeta(PythonPackage):
                     for (subdir, _) in subdirs:
                         # eggs always go in Python lib/pythonX/site-packages dir with setuptools
                         eb_dirs['setuptools'].append((os.path.join(sel_dirs[0], subdir), True))
-            except OSError, err:
+            except OSError as err:
                 raise EasyBuildError("Failed to determine sanity check dir paths: %s", err)
 
         # set of sanity check paths to check for EasyBuild
